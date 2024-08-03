@@ -6,11 +6,30 @@ The `/scrape` API is a web scraping endpoint built using Go and the Gin framewor
 
 ## Features
 
-- Accepts a list of target URLs via a POST request.
+- Accepts a list of target URLs via a POST request or CLI.
 - Fetches HTML content and associated scripts from each target URL.
 - Extracts Ethereum addresses from both HTML content and script content.
 - Ensures that script URLs are processed only if their top-level domain matches the target URL's top-level domain.
 - Returns a flat list of unique Ethereum addresses with their sources (HTML or script) and associated target URLs.
+
+## Dependencies
+```sh
+go get -u github.com/spf13/cobra
+go get github.com/gin-gonic/gin
+go get github.com/weppos/publicsuffix-go/publicsuffix
+```
+
+## Run via CLI
+
+```sh
+go run scrape.go https://example.com https://anotherexample.com
+```
+
+## Run via webserver
+
+```sh
+go run main.go
+```
 
 ## Endpoint
 

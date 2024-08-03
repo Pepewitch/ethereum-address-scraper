@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
     "reflect"
@@ -34,11 +34,11 @@ func TestResolveURL(t *testing.T) {
 
 func TestFindAddressInfos(t *testing.T) {
     tests := []struct {
-        content    string
-        src        string
+        content     string
+        src         string
         contentType string
-        target     string
-        expected   []AddressInfo
+        target      string
+        expected    []AddressInfo
     }{
         {
             "Here is an Ethereum address: 0x1234567890abcdef1234567890abcdef12345678",
