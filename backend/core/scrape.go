@@ -163,6 +163,20 @@ func getTopLevelDomain(hostname string) (string, error) {
 	return domain, nil
 }
 
+var blacklistHostnames = []string{
+	"google.com",
+	"localhost:5173",
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 // Scrape function to be used by both API and CLI
 func Scrape(targets []string) ([]AddressInfo, error) {
 	var allAddressInfos []AddressInfo
@@ -183,7 +197,11 @@ func Scrape(targets []string) ([]AddressInfo, error) {
 			log.Printf("Failed to parse target URL %s: %v", target, err)
 			continue
 		}
-		targetTLD, err := getTopLevelDomain(targetURL.Hostname())
+		targetHostname := targetURL.Hostname()
+		if contains(blacklistHostnames, targetHostname) {
+			continue
+		}
+		targetTLD, err := getTopLevelDomain(targetHostname)
 		if err != nil {
 			log.Printf("Failed to get TLD for target %s: %v", target, err)
 			continue
@@ -200,7 +218,11 @@ func Scrape(targets []string) ([]AddressInfo, error) {
 				log.Printf("Failed to parse script URL %s: %v", fullURL, err)
 				continue
 			}
-			scriptTLD, err := getTopLevelDomain(scriptURL.Hostname())
+			scriptHostname := scriptURL.Hostname()
+			if contains(blacklistHostnames, scriptHostname) {
+				continue
+			}
+			scriptTLD, err := getTopLevelDomain(scriptHostname)
 			if err != nil {
 				log.Printf("Failed to get TLD for script %s: %v", fullURL, err)
 				continue

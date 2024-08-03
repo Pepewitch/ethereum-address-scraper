@@ -1,12 +1,15 @@
 package api
 
 import (
+	"backend/core"
+	"context"
+	"log"
 	"net/http"
 	"os"
 	"strings"
 
-	"backend/core"
-
+	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/auth"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,6 +19,52 @@ type TargetsRequest struct {
 
 func RunServer() {
 	router := gin.Default()
+
+	// Add CORS middleware
+	router.Use(func(c *gin.Context) {
+		allowedOrigins := []string{"http://localhost:5173", "https://ethereum-address-scraper.web.app", "https://ethereum-address-scraper.firebaseapp.com"}
+		origin := c.Request.Header.Get("Origin")
+
+		if origin != "" {
+			for _, allowedOrigin := range allowedOrigins {
+				if origin == allowedOrigin {
+					c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+					break
+				}
+			}
+		}
+
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
+
+	var firebaseApp *firebase.App
+	var auth *auth.Client
+	ctx := context.Background()
+	isProduction := os.Getenv("APP_ENV") == "production"
+	if isProduction {
+		var err error
+		firebaseApp, err = firebase.NewApp(ctx, &firebase.Config{
+			ProjectID: "ethereum-address-scraper",
+		})
+		if err != nil {
+			log.Fatalf("error initializing app: %v\n", err)
+			panic(err)
+		}
+		auth, err = firebaseApp.Auth(ctx)
+		if err != nil {
+			log.Fatalf("error initializing auth: %v\n", err)
+			panic(err)
+		}
+	}
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -27,7 +76,7 @@ func RunServer() {
 		var request TargetsRequest
 
 		// Check for authorization headers if in production
-		if os.Getenv("APP_ENV") == "production" {
+		if isProduction {
 			authHeader := c.GetHeader("Authorization")
 			if authHeader == "" {
 				c.JSON(http.StatusUnauthorized, gin.H{
@@ -35,7 +84,25 @@ func RunServer() {
 				})
 				return
 			}
-			// Add your authorization logic here
+
+			// If Authorization headers is not starting with "Bearer ", return 401
+			if !strings.HasPrefix(authHeader, "Bearer ") {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "Authorization header must be a Bearer Token",
+				})
+				return
+			}
+
+			// strip "Bearer " from the beginning of the string
+			authHeader = strings.TrimPrefix(authHeader, "Bearer ")
+
+			_, err := auth.VerifyIDToken(ctx, authHeader)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "Invalid token",
+				})
+				return
+			}
 		}
 
 		if err := c.ShouldBindJSON(&request); err != nil {
