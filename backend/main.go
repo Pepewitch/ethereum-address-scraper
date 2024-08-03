@@ -9,6 +9,7 @@ import (
     "regexp"
     "strings"
     "golang.org/x/net/html"
+    "github.com/weppos/publicsuffix-go/publicsuffix"
 )
 
 // Define a struct to bind the JSON data
@@ -138,6 +139,15 @@ func uniqueAddressInfos(addressInfos []AddressInfo) []AddressInfo {
     return unique
 }
 
+// Function to get the top-level domain
+func getTopLevelDomain(hostname string) (string, error) {
+    domain, err := publicsuffix.Domain(hostname)
+    if err != nil {
+        return "", err
+    }
+    return domain, nil
+}
+
 func main() {
     // Create a new Gin router
     router := gin.Default()
@@ -195,7 +205,11 @@ func main() {
                 log.Printf("Failed to parse target URL %s: %v", target, err)
                 continue
             }
-            targetHostname := targetURL.Hostname()
+            targetTLD, err := getTopLevelDomain(targetURL.Hostname())
+            if err != nil {
+                log.Printf("Failed to get TLD for target %s: %v", target, err)
+                continue
+            }
 
             for _, script := range scripts {
                 fullURL, err := resolveURL(target, script)
@@ -208,7 +222,12 @@ func main() {
                     log.Printf("Failed to parse script URL %s: %v", fullURL, err)
                     continue
                 }
-                if scriptURL.Hostname() != targetHostname {
+                scriptTLD, err := getTopLevelDomain(scriptURL.Hostname())
+                if err != nil {
+                    log.Printf("Failed to get TLD for script %s: %v", fullURL, err)
+                    continue
+                }
+                if scriptTLD != targetTLD {
                     continue
                 }
 
