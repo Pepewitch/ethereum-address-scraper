@@ -21,13 +21,13 @@ go get github.com/weppos/publicsuffix-go/publicsuffix
 ## Run via CLI
 
 ```sh
-go run scrape.go https://example.com https://anotherexample.com
+go run scraper-main/main.go https://example.com https://anotherexample.com
 ```
 
 ## Run via webserver
 
 ```sh
-go run main.go
+go run api-main/main.go
 ```
 
 ## Endpoint
