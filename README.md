@@ -14,7 +14,6 @@ The `/scrape` API is a web scraping endpoint built using Go and the Gin framewor
 
 ## Dependencies
 ```sh
-go get -u github.com/spf13/cobra
 go get github.com/gin-gonic/gin
 go get github.com/weppos/publicsuffix-go/publicsuffix
 ```
