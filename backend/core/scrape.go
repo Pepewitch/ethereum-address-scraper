@@ -1,12 +1,13 @@
 package core
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/weppos/publicsuffix-go/publicsuffix"
 	"golang.org/x/net/html"
@@ -66,18 +67,21 @@ func resolveURL(base, ref string) (string, error) {
 
 // Function to fetch script content
 func fetchScriptContent(scriptURL string) (string, error) {
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
 	req, err := http.NewRequest("GET", scriptURL, nil)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("User-Agent", userAgent)
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -86,7 +90,9 @@ func fetchScriptContent(scriptURL string) (string, error) {
 
 // Function to fetch HTML content
 func fetchHTMLContent(targetURL string) (string, error) {
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
 	req, err := http.NewRequest("GET", targetURL, nil)
 	if err != nil {
 		return "", err
@@ -97,7 +103,7 @@ func fetchHTMLContent(targetURL string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
