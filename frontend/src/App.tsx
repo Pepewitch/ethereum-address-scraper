@@ -1,35 +1,70 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// src/App.tsx
+import React, { useState, useEffect } from "react";
+import { auth, signInWithGoogle } from "./firebaseConfig";
+import { onAuthStateChanged, User } from "firebase/auth";
 
-function App() {
-  const [count, setCount] = useState(0)
+const App: React.FC = () => {
+  const [targetUrl, setTargetUrl] = useState("");
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUser(user);
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
-    <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1 className="text-4xl font-bold text-red-400">Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <div className="h-screen bg-gray-100 p-4">
+      <div className="w-full max-w-sm mx-auto">
+          <h1 className="text-2xl font-bold mb-4">Ethereum Address Scraper</h1>
+          <p className="mb-2 font-bold">1. Login to use the app</p>
+          {user ? (
+          <p className="mb-4 text-gray-700 font-bold">
+            Logged in as: {user.email}
+          </p>
+        ) : (
+          <div>
+            <button
+              className="mb-4 bg-blue-500 text-white px-4 py-2 rounded-lg"
+              onClick={signInWithGoogle}
+            >
+              Login with Google
+            </button>
+          </div>
+        )}
 
-export default App
+        <p className="font-bold mb-2">2. Enter the URL to scrape</p>
+        <label
+          htmlFor="target-url"
+          className="block text-gray-700 font-bold mb-2"
+        >
+          Target URL
+        </label>
+        <input
+          id="target-url"
+          type="text"
+          className="w-full px-3 py-2 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          value={targetUrl}
+          onChange={(e) => setTargetUrl(e.target.value)}
+          disabled={!user}
+        />
+        <button
+          className={`w-full px-4 py-2 rounded-lg ${
+            user ? "bg-green-500 text-white" : "bg-gray-400 text-gray-700"
+          }`}
+          disabled={!user}
+        >
+          Action Button
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default App;
