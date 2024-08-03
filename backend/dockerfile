@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build the Go application
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o api-server ./main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o api-server ./api-main/main.go
 
 # Use a minimal base image
 FROM alpine:latest
