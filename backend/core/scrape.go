@@ -19,6 +19,8 @@ type AddressInfo struct {
     Targets []string `json:"targets"`
 }
 
+const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
+
 // Function to extract script URLs from HTML content
 func extractScripts(htmlContent string) []string {
     var scripts []string
@@ -64,7 +66,13 @@ func resolveURL(base, ref string) (string, error) {
 
 // Function to fetch script content
 func fetchScriptContent(scriptURL string) (string, error) {
-    resp, err := http.Get(scriptURL)
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", scriptURL, nil)
+    if err != nil {
+        return "", err
+    }
+    req.Header.Set("User-Agent", userAgent)
+    resp, err := client.Do(req)
     if err != nil {
         return "", err
     }
@@ -78,7 +86,13 @@ func fetchScriptContent(scriptURL string) (string, error) {
 
 // Function to fetch HTML content
 func fetchHTMLContent(targetURL string) (string, error) {
-    resp, err := http.Get(targetURL)
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", targetURL, nil)
+    if err != nil {
+        return "", err
+    }
+    req.Header.Set("User-Agent", userAgent)
+    resp, err := client.Do(req)
     if err != nil {
         return "", err
     }
