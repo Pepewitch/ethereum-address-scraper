@@ -3,15 +3,17 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signOut,
 } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyAqGacIQCimwMxcALy_s2hhCTt1KDhiVfw",
+  authDomain: "ethereum-address-scraper.firebaseapp.com",
+  projectId: "ethereum-address-scraper",
+  storageBucket: "ethereum-address-scraper.appspot.com",
+  messagingSenderId: "179669209059",
+  appId: "1:179669209059:web:d16d515c1e402f8a4d9ad6",
+  measurementId: "G-VDW9VQD0BZ",
 };
 
 const app = initializeApp(firebaseConfig);
@@ -23,4 +25,8 @@ const signInWithGoogle = async () => {
   return result.user;
 };
 
-export { auth, signInWithGoogle };
+const signOutFromApp = async () => {
+  await signOut(auth);
+};
+
+export { auth, signInWithGoogle, signOutFromApp };

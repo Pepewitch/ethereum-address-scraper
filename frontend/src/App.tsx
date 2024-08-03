@@ -1,6 +1,6 @@
 // src/App.tsx
 import React, { useState, useEffect } from "react";
-import { auth, signInWithGoogle } from "./firebaseConfig";
+import { auth, signInWithGoogle, signOutFromApp } from "./firebaseConfig";
 import { onAuthStateChanged, User } from "firebase/auth";
 
 const App: React.FC = () => {
@@ -22,24 +22,32 @@ const App: React.FC = () => {
   return (
     <div className="h-screen bg-gray-100 p-4">
       <div className="w-full max-w-sm mx-auto">
-          <h1 className="text-2xl font-bold mb-4">Ethereum Address Scraper</h1>
-          <p className="mb-2 font-bold">1. Login to use the app</p>
-          {user ? (
-          <p className="mb-4 text-gray-700 font-bold">
-            Logged in as: {user.email}
-          </p>
-        ) : (
-          <div>
+        <h1 className="text-2xl font-bold mb-6">Ethereum Address Scraper</h1>
+        <p className="my-2 font-bold">
+          1. Login to use the app {user ? "✅" : ""}
+        </p>
+        {user ? (
+          <>
+            <p className="mb-2 text-gray-700 font-bold">
+              Logged in as: {user.email}
+            </p>
             <button
-              className="mb-4 bg-blue-500 text-white px-4 py-2 rounded-lg"
-              onClick={signInWithGoogle}
+              className="mb-4 text-red-500 border-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-lg w-full"
+              onClick={signOutFromApp}
             >
-              Login with Google
+              Logout
             </button>
-          </div>
+          </>
+        ) : (
+          <button
+            className="mb-4 bg-blue-500 text-white px-4 py-2 rounded-lg w-full"
+            onClick={signInWithGoogle}
+          >
+            Login with Google
+          </button>
         )}
 
-        <p className="font-bold mb-2">2. Enter the URL to scrape</p>
+        <p className="font-bold my-2">2. Enter the URL to scrape</p>
         <label
           htmlFor="target-url"
           className="block text-gray-700 font-bold mb-2"
@@ -60,7 +68,7 @@ const App: React.FC = () => {
           }`}
           disabled={!user}
         >
-          Action Button
+          Scrape
         </button>
       </div>
     </div>
