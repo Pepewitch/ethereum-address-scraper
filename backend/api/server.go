@@ -7,15 +7,29 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/auth"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/time/rate"
 )
 
 type TargetsRequest struct {
 	Targets []string `json:"targets" binding:"required"`
 }
+
+// Add this struct and map at the package level
+type rateLimiter struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
+var (
+	limiters      = make(map[string]*rateLimiter)
+	limitersMutex sync.Mutex
+)
 
 func RunServer() {
 	router := gin.Default()
@@ -74,6 +88,9 @@ func RunServer() {
 
 	router.POST("/scrape", func(c *gin.Context) {
 		var request TargetsRequest
+		// Create a context with a 30-second timeout
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+		defer cancel()
 
 		// Check for authorization headers if in production
 		if isProduction {
@@ -94,13 +111,18 @@ func RunServer() {
 			}
 
 			// strip "Bearer " from the beginning of the string
-			authHeader = strings.TrimPrefix(authHeader, "Bearer ")
+			token := strings.TrimPrefix(authHeader, "Bearer ")
 
-			_, err := auth.VerifyIDToken(ctx, authHeader)
+			// Verify the token
+			_, err := auth.VerifyIDToken(ctx, token)
 			if err != nil {
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"error": "Invalid token",
-				})
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+				return
+			}
+
+			// Apply rate limiting
+			if !allowRequest(token) {
+				c.JSON(http.StatusTooManyRequests, gin.H{"error": "Rate limit exceeded"})
 				return
 			}
 		}
@@ -128,19 +150,74 @@ func RunServer() {
 			}
 		}
 
-		results, err := core.Scrape(request.Targets)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to scrape targets",
+		// Create a channel to receive the scraping results
+		resultsChan := make(chan []core.AddressInfo)
+		errChan := make(chan error)
+
+		go func() {
+			results, err := core.Scrape(request.Targets)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			resultsChan <- results
+		}()
+
+		select {
+		case <-ctx.Done():
+			c.JSON(http.StatusRequestTimeout, gin.H{
+				"error": "Request timed out after 30 seconds",
 			})
 			return
+		case err := <-errChan:
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to scrape targets: " + err.Error(),
+			})
+			return
+		case results := <-resultsChan:
+			c.JSON(http.StatusOK, gin.H{
+				"message": "Data fetched successfully",
+				"results": results,
+			})
 		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Data fetched successfully",
-			"results": results,
-		})
 	})
 
+	go func() {
+		for {
+			time.Sleep(1 * time.Hour)
+			cleanupLimiters()
+		}
+	}()
+
 	router.Run(":8080")
+}
+
+func allowRequest(token string) bool {
+	limitersMutex.Lock()
+	defer limitersMutex.Unlock()
+
+	limiter, exists := limiters[token]
+	if !exists {
+		// Create a new limiter with a rate of 1 per second and a burst of 30
+		limiter = &rateLimiter{limiter: rate.NewLimiter(rate.Limit(1), 30)}
+		limiters[token] = limiter
+	}
+
+	// Update last seen time
+	limiter.lastSeen = time.Now()
+
+	// Try to allow the request
+	return limiter.limiter.Allow()
+}
+
+// Add this function to clean up old limiters
+func cleanupLimiters() {
+	limitersMutex.Lock()
+	defer limitersMutex.Unlock()
+
+	for token, limiter := range limiters {
+		if time.Since(limiter.lastSeen) > 1*time.Hour {
+			delete(limiters, token)
+		}
+	}
 }

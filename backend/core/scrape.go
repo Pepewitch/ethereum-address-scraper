@@ -1,16 +1,27 @@
 package core
 
 import (
+	"backend/cache"
+	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/weppos/publicsuffix-go/publicsuffix"
 	"golang.org/x/net/html"
+)
+
+const maxCacheSize = 1000
+
+var (
+	targetCache = cache.NewFixedSizeCache(maxCacheSize)
+	scriptCache = cache.NewFixedSizeCache(maxCacheSize)
 )
 
 type AddressInfo struct {
@@ -20,7 +31,10 @@ type AddressInfo struct {
 	Targets []string `json:"targets"`
 }
 
-const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
+const (
+	userAgent      = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
+	maxContentSize = 5 * 1024 * 1024 // 5MB in bytes
+)
 
 // Function to extract script URLs from HTML content
 func extractScripts(htmlContent string) []string {
@@ -81,10 +95,17 @@ func fetchScriptContent(scriptURL string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+
+	limitedReader := io.LimitReader(resp.Body, maxContentSize)
+	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return "", err
 	}
+
+	if len(body) >= maxContentSize {
+		return "", errors.New("content exceeds maximum size of 5MB")
+	}
+
 	return string(body), nil
 }
 
@@ -103,10 +124,17 @@ func fetchHTMLContent(targetURL string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+
+	limitedReader := io.LimitReader(resp.Body, maxContentSize)
+	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return "", err
 	}
+
+	if len(body) >= maxContentSize {
+		return "", errors.New("content exceeds maximum size of 5MB")
+	}
+
 	return string(body), nil
 }
 
@@ -177,79 +205,136 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-// Scrape function to be used by both API and CLI
 func Scrape(targets []string) ([]AddressInfo, error) {
 	var allAddressInfos []AddressInfo
-	scriptCache := make(map[string]string)
+
 	for _, target := range targets {
-		content, err := fetchHTMLContent(target)
+		addressInfos, err := scrapeTarget(target)
 		if err != nil {
-			log.Printf("Failed to fetch data from %s: %v", target, err)
+			log.Printf("Error scraping target %s: %v", target, err)
 			continue
 		}
-
-		scripts := extractScripts(content)
-
-		addressInfos := findAddressInfos(content, target, "html", target)
-
-		targetURL, err := url.Parse(target)
-		if err != nil {
-			log.Printf("Failed to parse target URL %s: %v", target, err)
-			continue
-		}
-		targetHostname := targetURL.Hostname()
-		if contains(blacklistHostnames, targetHostname) {
-			continue
-		}
-		targetTLD, err := getTopLevelDomain(targetHostname)
-		if err != nil {
-			log.Printf("Failed to get TLD for target %s: %v", target, err)
-			continue
-		}
-
-		for _, script := range scripts {
-			fullURL, err := resolveURL(target, script)
-			if err != nil {
-				log.Printf("Failed to resolve script URL %s: %v", script, err)
-				continue
-			}
-			scriptURL, err := url.Parse(fullURL)
-			if err != nil {
-				log.Printf("Failed to parse script URL %s: %v", fullURL, err)
-				continue
-			}
-			scriptHostname := scriptURL.Hostname()
-			if contains(blacklistHostnames, scriptHostname) {
-				continue
-			}
-			scriptTLD, err := getTopLevelDomain(scriptHostname)
-			if err != nil {
-				log.Printf("Failed to get TLD for script %s: %v", fullURL, err)
-				continue
-			}
-			if scriptTLD != targetTLD {
-				continue
-			}
-
-			// Check if the script content is already cached
-			scriptContent, cached := scriptCache[fullURL]
-			if !cached {
-				// Fetch the script content if not cached
-				scriptContent, err = fetchScriptContent(fullURL)
-				if err != nil {
-					log.Printf("Failed to fetch script content from %s: %v", fullURL, err)
-					continue
-				}
-				// Cache the fetched script content
-				scriptCache[fullURL] = scriptContent
-			}
-
-			addressInfos = append(addressInfos, findAddressInfos(scriptContent, fullURL, "script", target)...)
-		}
-
 		allAddressInfos = append(allAddressInfos, addressInfos...)
 	}
 
-	uniqueAddressInfos := uniqueAddressInfos(allAddressInfos)
-	return uniqueAddressInfos, nil
+	return uniqueAddressInfos(allAddressInfos), nil
+}
+
+func scrapeTarget(target string) ([]AddressInfo, error) {
+	if cachedResult, ok := targetCache.Get(target); ok {
+		return cachedResult.([]AddressInfo), nil
+	}
+
+	content, err := fetchHTMLContent(target)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch data from %s: %v", target, err)
+	}
+
+	addressInfos := findAddressInfos(content, target, "html", target)
+	scripts := extractScripts(content)
+
+	scriptInfos, err := processScripts(target, scripts)
+	if err != nil {
+		return nil, err
+	}
+
+	addressInfos = append(addressInfos, scriptInfos...)
+
+	targetCache.Set(target, addressInfos)
+
+	return addressInfos, nil
+}
+
+func processScripts(target string, scripts []string) ([]AddressInfo, error) {
+	targetTLD, err := getTLD(target)
+	if err != nil {
+		return nil, err
+	}
+
+	var wg sync.WaitGroup
+	scriptInfosChan := make(chan []AddressInfo, len(scripts))
+
+	for _, script := range scripts {
+		wg.Add(1)
+		go func(script string) {
+			defer wg.Done()
+			scriptInfos, err := processScript(target, script, targetTLD)
+			if err != nil {
+				log.Printf("Error processing script %s: %v", script, err)
+				return
+			}
+			scriptInfosChan <- scriptInfos
+		}(script)
+	}
+
+	go func() {
+		wg.Wait()
+		close(scriptInfosChan)
+	}()
+
+	var allScriptInfos []AddressInfo
+	for scriptInfos := range scriptInfosChan {
+		allScriptInfos = append(allScriptInfos, scriptInfos...)
+	}
+
+	return allScriptInfos, nil
+}
+
+func processScript(target, script, targetTLD string) ([]AddressInfo, error) {
+	fullURL, err := resolveURL(target, script)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve script URL %s: %v", script, err)
+	}
+
+	scriptURL, err := url.Parse(fullURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse script URL %s: %v", fullURL, err)
+	}
+
+	scriptHostname := scriptURL.Hostname()
+	if contains(blacklistHostnames, scriptHostname) {
+		return nil, nil
+	}
+
+	scriptTLD, err := getTopLevelDomain(scriptHostname)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get TLD for script %s: %v", fullURL, err)
+	}
+
+	if scriptTLD != targetTLD {
+		return nil, nil
+	}
+
+	scriptContent, err := getScriptContent(fullURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return findAddressInfos(scriptContent, fullURL, "script", target), nil
+}
+
+func getScriptContent(fullURL string) (string, error) {
+	if cachedContent, ok := scriptCache.Get(fullURL); ok {
+		return cachedContent.(string), nil
+	}
+
+	scriptContent, err := fetchScriptContent(fullURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch script content from %s: %v", fullURL, err)
+	}
+	scriptCache.Set(fullURL, scriptContent)
+
+	return scriptContent, nil
+}
+
+func getTLD(target string) (string, error) {
+	targetURL, err := url.Parse(target)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse target URL %s: %v", target, err)
+	}
+	targetHostname := targetURL.Hostname()
+	if contains(blacklistHostnames, targetHostname) {
+		return "", fmt.Errorf("target hostname %s is blacklisted", targetHostname)
+	}
+	return getTopLevelDomain(targetHostname)
 }
