@@ -1,5 +1,7 @@
 # Ethereum Address Scraper
 
+Try it here: https://ethereum-address-scraper.web.app/
+
 ## Overview
 
 The `/scrape` API is a web scraping endpoint built using Go and the Gin framework. It allows users to send a list of target URLs and retrieves Ethereum addresses from the HTML content and associated script files of those URLs. The API ensures that script URLs are processed only if their top-level domain matches the top-level domain of the target URL.
