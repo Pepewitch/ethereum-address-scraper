@@ -194,6 +194,7 @@ func getTopLevelDomain(hostname string) (string, error) {
 var blacklistHostnames = []string{
 	"google.com",
 	"localhost:5173",
+	"ethereum-address-scraper-api-n3j67ioglq-as.a.run.app",
 }
 
 func contains(slice []string, item string) bool {
