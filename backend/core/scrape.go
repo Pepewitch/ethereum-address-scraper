@@ -33,7 +33,7 @@ type AddressInfo struct {
 
 const (
 	userAgent      = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
-	maxContentSize = 5 * 1024 * 1024 // 5MB in bytes
+	maxContentSize = 20 * 1024 * 1024 // 20MB in bytes
 )
 
 // Function to extract script URLs from HTML content
@@ -103,7 +103,7 @@ func fetchScriptContent(scriptURL string) (string, error) {
 	}
 
 	if len(body) >= maxContentSize {
-		return "", errors.New("content exceeds maximum size of 5MB")
+		return "", errors.New("content exceeds maximum size of 20MB")
 	}
 
 	return string(body), nil
@@ -132,7 +132,7 @@ func fetchHTMLContent(targetURL string) (string, error) {
 	}
 
 	if len(body) >= maxContentSize {
-		return "", errors.New("content exceeds maximum size of 5MB")
+		return "", errors.New("content exceeds maximum size of 20MB")
 	}
 
 	return string(body), nil
