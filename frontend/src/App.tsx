@@ -11,12 +11,14 @@ import { checkAddressTypesBatch } from "./ChainUtils";
 
 type ScrapeResponse = {
   message: string;
-  results: {
-    address: string;
-    src: string;
-    type: string;
-    targets: string[];
-  }[];
+  results:
+    | {
+        address: string;
+        src: string;
+        type: string;
+        targets: string[];
+      }[]
+    | null;
 };
 
 enum Chain {
@@ -189,7 +191,7 @@ const App: React.FC = observer(() => {
     }
   };
 
-  const filteredData = data?.results.filter((result) => {
+  const filteredData = data?.results?.filter((result) => {
     const addressInfo = addressStore.getAddressInfo(
       result.address,
       selectedChain as Chain
@@ -353,126 +355,142 @@ const App: React.FC = observer(() => {
         {isScraping && <p className="text-gray-700">Scraping...</p>}
         {data && (
           <div className="bg-white p-4 rounded-lg shadow-md">
-            <div className="flex space-x-4 mb-4">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={showEOA}
-                  onChange={() => toggleFilter("showEOA")}
-                  className="mr-2"
-                />
-                Show EOA
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={showToken}
-                  onChange={() => toggleFilter("showToken")}
-                  className="mr-2"
-                />
-                Show Token
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={showUnknownContract}
-                  onChange={() => toggleFilter("showUnknownContract")}
-                  className="mr-2"
-                />
-                Show Unknown Contract
-              </label>
-            </div>
-            <p className="text-gray-700 font-bold mb-2">Select Chain</p>
-            <p className="text-gray-700 text-sm mb-2">
-              Note: Selecting the chain will fetch the Address Type and Symbol
-              for the results.
-            </p>
-            <select
-              className="w-full px-3 py-2 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={selectedChain}
-              onChange={handleSelectChain}
-              disabled={!user}
-            >
-              {Object.values(Chain).map((chain) => (
-                <option key={chain} value={chain}>
-                  {chain.charAt(0).toUpperCase() + chain.slice(1)}
-                </option>
-              ))}
-              <option value={""}>Please select chain</option>
-            </select>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold">Results</h2>
-              <button
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg"
-                onClick={downloadCSV}
-                disabled={!filteredData || filteredData.length === 0}
-              >
-                Download CSV
-              </button>
-            </div>
-            <div className="w-full overflow-auto">
-              <table className="w-full border-gray-300 border-solid border">
-                <thead>
-                  <tr>
-                    <th className="text-left p-2">Address</th>
-                    <th className="text-left p-2">Address Type</th>
-                    <th className="text-left p-2">Symbol</th>
-                    <th className="text-right p-2">Blockscan</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentItems?.map((result, index) => {
-                    const addressInfo = addressStore.getAddressInfo(
-                      result.address,
-                      selectedChain as Chain
-                    );
-                    return (
-                      <tr key={`${index}-${result.address}-${selectedChain}`}>
-                        <td className="px-2">{maskAddress(result.address)}</td>
-                        <td className="px-2">{addressInfo.type}</td>
-                        <td className="px-2">
-                          {addressInfo.type === AddressType.TOKEN
-                            ? addressInfo.symbol
-                            : "-"}
-                        </td>
-                        <td className="text-right px-2">
-                          <a
-                            href={`${
-                              blockscanBaseUrlMap[
-                                selectedChain || Chain.ETHEREUM
-                              ]
-                            }/address/${result.address}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            View
-                          </a>
-                        </td>
+            {data.results === null ? (
+              <p className="text-red-500 font-bold mb-4">
+                Error: We couldn't find any Ethereum addresses. This might be
+                due to Cloudflare protection or other anti-scraping measures on
+                the website.
+              </p>
+            ) : (
+              <>
+                <div className="flex space-x-4 mb-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={showEOA}
+                      onChange={() => toggleFilter("showEOA")}
+                      className="mr-2"
+                    />
+                    Show EOA
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={showToken}
+                      onChange={() => toggleFilter("showToken")}
+                      className="mr-2"
+                    />
+                    Show Token
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={showUnknownContract}
+                      onChange={() => toggleFilter("showUnknownContract")}
+                      className="mr-2"
+                    />
+                    Show Unknown Contract
+                  </label>
+                </div>
+                <p className="text-gray-700 font-bold mb-2">Select Chain</p>
+                <p className="text-gray-700 text-sm mb-2">
+                  Note: Selecting the chain will fetch the Address Type and
+                  Symbol for the results.
+                </p>
+                <select
+                  className="w-full px-3 py-2 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={selectedChain}
+                  onChange={handleSelectChain}
+                  disabled={!user}
+                >
+                  {Object.values(Chain).map((chain) => (
+                    <option key={chain} value={chain}>
+                      {chain.charAt(0).toUpperCase() + chain.slice(1)}
+                    </option>
+                  ))}
+                  <option value={""}>Please select chain</option>
+                </select>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-bold">Results</h2>
+                  <button
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg"
+                    onClick={downloadCSV}
+                    disabled={!filteredData || filteredData.length === 0}
+                  >
+                    Download CSV
+                  </button>
+                </div>
+                <div className="w-full overflow-auto">
+                  <table className="w-full border-gray-300 border-solid border">
+                    <thead>
+                      <tr>
+                        <th className="text-left p-2">Address</th>
+                        <th className="text-left p-2">Address Type</th>
+                        <th className="text-left p-2">Symbol</th>
+                        <th className="text-right p-2">Blockscan</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-4 flex justify-center items-center">
-              <button
-                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="mx-1 px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
-              >
-                &lt;
-              </button>
-              {renderPageNumbers()}
-              <button
-                onClick={() =>
-                  handlePageChange(Math.min(totalPages, currentPage + 1))
-                }
-                disabled={currentPage === totalPages}
-                className="mx-1 px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
-              >
-                &gt;
-              </button>
-            </div>
+                    </thead>
+                    <tbody>
+                      {currentItems?.map((result, index) => {
+                        const addressInfo = addressStore.getAddressInfo(
+                          result.address,
+                          selectedChain as Chain
+                        );
+                        return (
+                          <tr
+                            key={`${index}-${result.address}-${selectedChain}`}
+                          >
+                            <td className="px-2">
+                              {maskAddress(result.address)}
+                            </td>
+                            <td className="px-2">{addressInfo.type}</td>
+                            <td className="px-2">
+                              {addressInfo.type === AddressType.TOKEN
+                                ? addressInfo.symbol
+                                : "-"}
+                            </td>
+                            <td className="text-right px-2">
+                              <a
+                                href={`${
+                                  blockscanBaseUrlMap[
+                                    selectedChain || Chain.ETHEREUM
+                                  ]
+                                }/address/${result.address}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                View
+                              </a>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-4 flex justify-center items-center">
+                  <button
+                    onClick={() =>
+                      handlePageChange(Math.max(1, currentPage - 1))
+                    }
+                    disabled={currentPage === 1}
+                    className="mx-1 px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
+                  >
+                    &lt;
+                  </button>
+                  {renderPageNumbers()}
+                  <button
+                    onClick={() =>
+                      handlePageChange(Math.min(totalPages, currentPage + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="mx-1 px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
+                  >
+                    &gt;
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
