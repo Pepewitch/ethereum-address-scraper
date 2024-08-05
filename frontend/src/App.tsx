@@ -364,7 +364,7 @@ const App: React.FC = observer(() => {
             ) : (
               <>
                 <div className="flex space-x-4 mb-4">
-                  <label className="flex items-center">
+                  <label className="flex items-center text-black">
                     <input
                       type="checkbox"
                       checked={showEOA}
@@ -373,7 +373,7 @@ const App: React.FC = observer(() => {
                     />
                     Show EOA
                   </label>
-                  <label className="flex items-center">
+                  <label className="flex items-center text-black">
                     <input
                       type="checkbox"
                       checked={showToken}
@@ -398,13 +398,13 @@ const App: React.FC = observer(() => {
                   Symbol for the results.
                 </p>
                 <select
-                  className="w-full px-3 py-2 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 mb-4 border bg-transparent border-gray-300 text-black rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={selectedChain}
                   onChange={handleSelectChain}
                   disabled={!user}
                 >
                   {Object.values(Chain).map((chain) => (
-                    <option key={chain} value={chain}>
+                    <option key={chain} value={chain} className="text-black">
                       {chain.charAt(0).toUpperCase() + chain.slice(1)}
                     </option>
                   ))}
@@ -424,10 +424,10 @@ const App: React.FC = observer(() => {
                   <table className="w-full border-gray-300 border-solid border">
                     <thead>
                       <tr>
-                        <th className="text-left p-2">Address</th>
-                        <th className="text-left p-2">Address Type</th>
-                        <th className="text-left p-2">Symbol</th>
-                        <th className="text-right p-2">Blockscan</th>
+                        <th className="text-left p-2 text-black">Address</th>
+                        <th className="text-left p-2 text-black">Address Type</th>
+                        <th className="text-left p-2 text-black">Symbol</th>
+                        <th className="text-right p-2 text-black">Blockscan</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -440,16 +440,18 @@ const App: React.FC = observer(() => {
                           <tr
                             key={`${index}-${result.address}-${selectedChain}`}
                           >
-                            <td className="px-2">
+                            <td className="px-2 text-black">
                               {maskAddress(result.address)}
                             </td>
-                            <td className="px-2">{addressInfo.type}</td>
-                            <td className="px-2">
+                            <td className="px-2 text-black">
+                              {addressInfo.type}
+                            </td>
+                            <td className="px-2 text-black">
                               {addressInfo.type === AddressType.TOKEN
                                 ? addressInfo.symbol
                                 : "-"}
                             </td>
-                            <td className="text-right px-2">
+                            <td className="text-right px-2 text-black">
                               <a
                                 href={`${
                                   blockscanBaseUrlMap[
